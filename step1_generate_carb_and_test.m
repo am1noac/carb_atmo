@@ -363,15 +363,20 @@ function C_sim = run_comsol_with_carb_txt(exp_data, comsol_params, carb_file)
 
         % 根据模型维度构造坐标
         % 假设：深度是x方向，y=0（或y,z=0对于3D）
+        % 确保depths_m是行向量
+        if size(depths_m, 1) > size(depths_m, 2)
+            depths_m = depths_m';  % 转换为行向量
+        end
+
         if geom_dim == 1
-            % 1D模型：只需要x坐标
+            % 1D模型：只需要x坐标（列向量）
             coords = depths_m';
         elseif geom_dim == 2
-            % 2D模型：需要x,y坐标
-            coords = [depths_m'; zeros(1, length(depths_m))];
+            % 2D模型：需要x,y坐标 (2行N列)
+            coords = [depths_m; zeros(1, length(depths_m))];
         elseif geom_dim == 3
-            % 3D模型：需要x,y,z坐标
-            coords = [depths_m'; zeros(1, length(depths_m)); zeros(1, length(depths_m))];
+            % 3D模型：需要x,y,z坐标 (3行N列)
+            coords = [depths_m; zeros(1, length(depths_m)); zeros(1, length(depths_m))];
         else
             error('不支持的几何维度: %d', geom_dim);
         end
