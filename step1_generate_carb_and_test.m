@@ -352,65 +352,15 @@ function C_sim = run_comsol_with_carb_txt(exp_data, comsol_params, carb_file)
         fprintf('  提取结果...\n');
         depths_m = exp_data.depths / 1000;  % mm转m
 
-        % 检测模型维度
-        geom = model.geom.tags;
-        if length(geom) == 0
-            error('模型中未找到几何');
-        end
-        geom_tag = char(geom(1));
-        geom_dim = model.geom(geom_tag).getSDim();
-        fprintf('    模型几何维度: %d\n', geom_dim);
-
-        % 根据模型维度构造坐标
-        % 假设：深度是x方向，y=0（或y,z=0对于3D）
-        % 确保depths_m是行向量
-        if size(depths_m, 1) > size(depths_m, 2)
-            depths_m = depths_m';  % 转换为行向量
-        end
-
-        if geom_dim == 1
-            % 1D模型：只需要x坐标（列向量）
-            coords = depths_m';
-        elseif geom_dim == 2
-            % 2D模型：需要x,y坐标 (2行N列)
-            coords = [depths_m; zeros(1, length(depths_m))];
-        elseif geom_dim == 3
-            % 3D模型：需要x,y,z坐标 (3行N列)
-            coords = [depths_m; zeros(1, length(depths_m)); zeros(1, length(depths_m))];
-        else
-            error('不支持的几何维度: %d', geom_dim);
-        end
-
+        % 构造2D坐标矩阵 (2行N列): [x坐标; y坐标]
+        % 假设：深度是x方向，y=0
+        coords = [depths_m(:)'; zeros(1, length(depths_m))];
         fprintf('    坐标矩阵大小: %dx%d\n', size(coords, 1), size(coords, 2));
 
-        % 尝试使用mphinterp提取结果
-        try
-            C_sim = mphinterp(model, 'c', 'coord', coords);
-            C_sim = C_sim(:);
-            fprintf('    使用mphinterp提取成功\n');
-        catch ME1
-            fprintf('    mphinterp失败: %s\n', ME1.message);
-            fprintf('    尝试使用mpheval替代...\n');
-
-            % 备选方案：使用mpheval
-            try
-                % 获取最后一个时间步的数据
-                result = mpheval(model, 'c', 'dataset', 'dset1', ...
-                                'edim', 0, 'selection', 1);
-
-                % 在指定深度插值
-                C_sim = zeros(length(depths_m), 1);
-                for i = 1:length(depths_m)
-                    % 找到最接近的点
-                    [~, idx] = min(abs(result.p(1,:) - depths_m(i)));
-                    C_sim(i) = result.d1(idx);
-                end
-                fprintf('    使用mpheval提取成功\n');
-            catch ME2
-                fprintf('    mpheval也失败: %s\n', ME2.message);
-                rethrow(ME1);  % 抛出原始错误
-            end
-        end
+        % 使用mphinterp提取结果
+        C_sim = mphinterp(model, 'c', 'coord', coords);
+        C_sim = C_sim(:);
+        fprintf('    提取成功，数据点数: %d\n', length(C_sim));
 
         % 7. 清理
         ModelUtil.remove('model');
